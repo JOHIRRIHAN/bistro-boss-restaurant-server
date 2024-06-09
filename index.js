@@ -1,5 +1,5 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId,  } = require("mongodb");
 var cors = require("cors");
 const app = express();
 require("dotenv").config();
@@ -34,7 +34,12 @@ async function run() {
         const result = await userCollection.find().toArray();
         res.send(result);
     })
-    
+    app.delete('/users/:id', async(req, res)=>{
+        const id = req.params.id;
+        const query = {_id: new ObjectId(id)}
+        const result = await userCollection.deleteOne(query)
+        res.send(result)
+    })
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -46,11 +51,25 @@ async function run() {
       res.send(result);
     });
 
+    app.patch('/users/admin/:id', async(req, res)=>{
+        const id = req.params.id;
+        const filter = {_id: new ObjectId(id)};
+        const updatedDoc = {
+            $set: {
+                role: 'admin'
+            }
+        }
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+    })
+    
+    // menus API 
     app.get("/menus", async (req, res) => {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
-
+    
+    // review API 
     app.get("/reviews", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
       res.send(result);
