@@ -1,7 +1,7 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion, ObjectId,  } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 var cors = require("cors");
-var jwt = require('jsonwebtoken');
+var jwt = require("jsonwebtoken");
 const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
@@ -30,17 +30,33 @@ async function run() {
     const reviewsCollection = client.db("bistroDB").collection("reviews");
     const cartCollection = client.db("bistroDB").collection("carts");
 
+    // middle Ware
+    const verifyToken = (req, res, next) => {
+      console.log("inside verify token", req.headers.authorization);
+      if(!req.headers.authorization){
+        return res.status(401).send({message: 'forbidden access'})
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.Access_TOKEN_SECRET, (err, decoded)=>{
+        if(err){
+            return res.status(401).send({message: 'forbidden access'})
+        }
+        req.decoded = decoded
+        next();
+      })
+    };
+
     // user related api
-    app.get('/users', async(req, res)=>{
-        const result = await userCollection.find().toArray();
-        res.send(result);
-    })
-    app.delete('/users/:id', async(req, res)=>{
-        const id = req.params.id;
-        const query = {_id: new ObjectId(id)}
-        const result = await userCollection.deleteOne(query)
-        res.send(result)
-    })
+    app.get("/users", verifyToken, async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -52,25 +68,48 @@ async function run() {
       res.send(result);
     });
 
-    app.patch('/users/admin/:id', async(req, res)=>{
-        const id = req.params.id;
-        const filter = {_id: new ObjectId(id)};
-        const updatedDoc = {
-            $set: {
-                role: 'admin'
-            }
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.get('/users/admin/:email', verifyToken, async(req, res)=>{
+        const email = req.params.email;
+        if(email !== req.decoded.email){
+            return res.status(403).send({message: 'unauthorized access'})
         }
-        const result = await userCollection.updateOne(filter, updatedDoc);
-        res.send(result);
+        const query = {email: email};
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if(user){
+            admin = user?.role === 'admin';
+        }
+        res.send({admin});
     })
-    
-    // menus API 
+
+    // jwt related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.Access_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    // menus API
     app.get("/menus", async (req, res) => {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
-    
-    // review API 
+
+    // review API
     app.get("/reviews", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
       res.send(result);
