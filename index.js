@@ -33,8 +33,8 @@ async function run() {
     // middle Ware
     const verifyToken = (req, res, next) => {
       console.log("inside verify token", req.headers.authorization);
-      if(!req.headers.authorization){
-        return res.status(401).send({message: 'forbidden access'})
+      if(!req.headers.authorization){ 
+        return res.status(401).send({message: 'forbidden access 1'})
       }
       const token = req.headers.authorization.split(' ')[1];
       jwt.verify(token, process.env.Access_TOKEN_SECRET, (err, decoded)=>{
@@ -119,6 +119,11 @@ async function run() {
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
+    app.post('/menus', verifyToken, verifyAdmin, async(req, res)=>{
+      const item = req.body;
+      const result = await menuCollection.insertOne(item);
+      res.send(result);
+    })
 
     // review API
     app.get("/reviews", async (req, res) => {
