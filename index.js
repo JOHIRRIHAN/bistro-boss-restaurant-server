@@ -10,6 +10,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASSWORD}@cluster0.loknebs.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -32,7 +33,7 @@ async function run() {
 
     // middle Ware
     const verifyToken = (req, res, next) => {
-      console.log("inside verify token", req.headers.authorization);
+      // console.log("inside verify token", req.headers.authorization);
       if(!req.headers.authorization){ 
         return res.status(401).send({message: 'forbidden access 1'})
       }
@@ -124,7 +125,25 @@ async function run() {
       const result = await menuCollection.insertOne(item);
       res.send(result);
     })
-
+    app.delete('/menus/:id', verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const id = req.params.id;
+        console.log(`Deleting item with id: ${id}`);
+        const query = { _id: new ObjectId(id) };
+        const result = await menuCollection.deleteOne(query);
+        console.log("Delete result:", result);
+        
+        if (result.deletedCount === 1) {
+          res.status(200).send({ deletedCount: result.deletedCount });
+        } else {
+          res.status(404).send({ message: "Item not found" });
+        }
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
+    });
+    
     // review API
     app.get("/reviews", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
