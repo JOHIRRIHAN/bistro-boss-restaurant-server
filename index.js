@@ -1,7 +1,9 @@
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-var cors = require("cors");
-var jwt = require("jsonwebtoken");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const stripe = require('stripe')(process.env.STEP_SECRET_KEY)
+// console.log("step", stripe)
 const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
@@ -25,11 +27,12 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     const userCollection = client.db("bistroDB").collection("user");
     const menuCollection = client.db("bistroDB").collection("menu");
     const reviewsCollection = client.db("bistroDB").collection("reviews");
     const cartCollection = client.db("bistroDB").collection("carts");
+    const paymentCollection = client.db("bistroDB").collection("payments");
 
     // middle Ware
     const verifyToken = (req, res, next) => {
@@ -169,11 +172,45 @@ async function run() {
       res.send(result);
     });
 
+    // payment intent 
+    app.post('/create-payment-intent', async(req, res)=>{
+      const {price} = req.body;
+      const amount = parseInt(price * 100);
+      // console.log(amount)
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+
+    app.get('/admin-stats', async(req, res)=>{
+      const users = await userCollection.estimatedDocumentCount();
+      const menuItem = await menuCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+
+      const payments = await paymentCollection.find().toArray();
+      console.log('payment', payments)
+      const revenue = payments?.reduce((total , payments) => total + payments.price, 0);
+      console.log("revenue", revenue)
+      res.send({
+        users,
+        menuItem,
+        orders,
+        revenue
+      });
+    });
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB! bistro boss"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB! bistro boss"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
